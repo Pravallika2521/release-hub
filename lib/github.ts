@@ -5,7 +5,7 @@ export async function getGitHubCommits() {
     `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/commits`,
     {
       headers: {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
+        "User-Agent": "release-hub-app"
       }
     }
   );
@@ -15,4 +15,3 @@ export async function getGitHubCommits() {
     author: c.commit.author.name
   }));
 }
-``
