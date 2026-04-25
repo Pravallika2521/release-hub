@@ -1,3 +1,6 @@
+const [view, setView] = useState<"dashboard" | "issues">("dashboard");
+const [issues, setIssues] = useState<any[]>([]);
+const [selectedIssue, setSelectedIssue] = useState<any>(null);
 "use client";
 
 import { useEffect, useState } from "react";
