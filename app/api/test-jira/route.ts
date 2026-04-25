@@ -4,7 +4,7 @@ import axios from "axios";
 export async function GET() {
   try {
     const response = await axios.get(
-      `${process.env.JIRA_BASE_URL}/rest/api/3/search`,
+      `${process.env.JIRA_BASE_URL}/rest/api/3/search/jql`,
       {
         headers: {
           Accept: "application/json"
@@ -15,6 +15,7 @@ export async function GET() {
         },
         params: {
           jql: `project=${process.env.JIRA_PROJECT_KEY}`,
+          fields: "summary,status",
           maxResults: 5
         }
       }
@@ -26,7 +27,7 @@ export async function GET() {
       {
         source: "JIRA",
         status: err.response?.status,
-        data: err.response?.data || err.message
+        message: err.response?.data || err.message
       },
       { status: 500 }
     );
