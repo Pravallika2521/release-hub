@@ -1,17 +1,30 @@
 import { NextResponse } from "next/server";
-import { getJiraIssues } from "@/lib/jira";
-import { getGitHubCommits } from "@/lib/github";
+
+// ✅ Use RELATIVE paths (this fixes your Vercel error)
+import { getJiraIssues } from "../../../lib/jira";
+import { getGitHubCommits } from "../../../lib/github";
 
 export async function GET() {
-  const jira = await getJiraIssues();
-  const commits = await getGitHubCommits();
+  try {
+    const jiraIssues = await getJiraIssues();
+    const commits = await getGitHubCommits();
 
-  const doneCount = jira.filter(i => i.status === "Done").length;
-  const readinessScore = Math.min(100, doneCount * 10);
+    // Simple readiness score logic
+    const doneCount = jiraIssues.filter(
+      (issue: any) => issue.status === "Done"
+    ).length;
 
-  return NextResponse.json({
-    jira,
-    commits,
-    readinessScore
-  });
+    const readinessScore = Math.min(100, doneCount * 10);
+
+    return NextResponse.json({
+      jiraIssues,
+      commits,
+      readinessScore
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || "Analysis failed" },
+      { status: 500 }
+    );
+  }
 }
