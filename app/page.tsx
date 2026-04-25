@@ -205,4 +205,3 @@ const detailsBox = {
   background: "#f9fafb",
   borderRadius: 10
 };
-``
