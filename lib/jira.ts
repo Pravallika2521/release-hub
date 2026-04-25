@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export async function getJiraIssues() {
-  const allIssues: any[] = [];
+  const issues: any[] = [];
   let startAt = 0;
   const maxResults = 50;
 
@@ -10,34 +10,37 @@ export async function getJiraIssues() {
       `${process.env.JIRA_BASE_URL}/rest/api/3/search/jql`,
       {
         headers: {
-          Accept: "application/json"
+          Accept: "application/json",
+          "Cache-Control": "no-cache"
         },
         auth: {
           username: process.env.JIRA_EMAIL!,
           password: process.env.JIRA_API_TOKEN!
         },
         params: {
-          jql: `project=${process.env.JIRA_PROJECT_KEY} ORDER BY created DESC`,
-          fields: "summary,status",
+          jql: `
+            project = ${process.env.JIRA_PROJECT_KEY}
+            ORDER BY created DESC
+          `,
+          fields: "summary,status,created,updated",
           startAt,
           maxResults
         }
       }
     );
 
-    const issues = response.data.issues || [];
-    allIssues.push(...issues);
+    const batch = response.data.issues || [];
+    issues.push(...batch);
 
-    if (response.data.isLast || issues.length < maxResults) {
-      break;
-    }
-
+    if (batch.length < maxResults) break;
     startAt += maxResults;
   }
 
-  return allIssues.map((issue: any) => ({
+  return issues.map(issue => ({
     key: issue.key,
     summary: issue.fields.summary,
-    status: issue.fields.status.name
+    status: issue.fields.status.name,
+    created: issue.fields.created,
+    updated: issue.fields.updated
   }));
 }
