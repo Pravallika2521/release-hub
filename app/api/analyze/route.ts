@@ -18,9 +18,15 @@ export async function GET() {
       commits,
       readinessScore
     });
-  } catch (error: any) {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: error.message || "Release analysis failed" },
+      {
+        source: err.response?.config?.url?.includes("atlassian")
+          ? "JIRA"
+          : "GITHUB",
+        status: err.response?.status,
+        message: err.response?.data || err.message
+      },
       { status: 500 }
     );
   }
