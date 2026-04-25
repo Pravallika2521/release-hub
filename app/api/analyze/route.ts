@@ -1,30 +1,13 @@
 import { NextResponse } from "next/server";
 
-// ✅ Use RELATIVE paths (this fixes your Vercel error)
-import { getJiraIssues } from "../../../lib/jira";
-import { getGitHubCommits } from "../../../lib/github";
-
 export async function GET() {
-  try {
-    const jiraIssues = await getJiraIssues();
-    const commits = await getGitHubCommits();
-
-    // Simple readiness score logic
-    const doneCount = jiraIssues.filter(
-      (issue: any) => issue.status === "Done"
-    ).length;
-
-    const readinessScore = Math.min(100, doneCount * 10);
-
-    return NextResponse.json({
-      jiraIssues,
-      commits,
-      readinessScore
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Analysis failed" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    JIRA_BASE_URL: process.env.JIRA_BASE_URL ?? "MISSING",
+    JIRA_EMAIL: process.env.JIRA_EMAIL ? "SET" : "MISSING",
+    JIRA_API_TOKEN: process.env.JIRA_API_TOKEN ? "SET" : "MISSING",
+    JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY ?? "MISSING",
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN ? "SET" : "MISSING",
+    GITHUB_OWNER: process.env.GITHUB_OWNER ?? "MISSING",
+    GITHUB_REPO: process.env.GITHUB_REPO ?? "MISSING"
+  });
 }
