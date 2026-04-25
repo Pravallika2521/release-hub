@@ -1,34 +1,35 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { getJiraIssues } from "../../../lib/jira";
 import { getGitHubCommits } from "../../../lib/github";
 
 export async function GET() {
-  try {
-    const jiraIssues = await getJiraIssues();
-    const commits = await getGitHubCommits();
+  const jiraIssues = await getJiraIssues();
+  const commits = await getGitHubCommits();
 
-    const doneCount = jiraIssues.filter(
-      (issue: any) => issue.status === "Done"
-    ).length;
+  const doneCount = jiraIssues.filter(
+    (i: any) => i.status === "Done"
+  ).length;
 
-    const readinessScore = Math.min(100, doneCount * 10);
+  const readinessScore = doneCount * 10;
 
-    return NextResponse.json({
+  return new Response(
+    JSON.stringify({
       jiraIssues,
       commits,
-      readinessScore
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      {
-        source: err.response?.config?.url?.includes("atlassian")
-          ? "JIRA"
-          : "GITHUB",
-        status: err.response?.status,
-        message: err.response?.data || err.message
-      },
-      { status: 500 }
-    );
-  }
+      readinessScore,
+      serverTime: new Date().toISOString() // DEBUG
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0"
+      }
+    }
+  );
 }
-``
