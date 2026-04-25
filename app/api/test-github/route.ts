@@ -7,7 +7,6 @@ export async function GET() {
       `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/commits`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
           "User-Agent": "release-hub-app"
         }
       }
@@ -19,7 +18,7 @@ export async function GET() {
       {
         source: "GITHUB",
         status: err.response?.status,
-        data: err.response?.data || err.message
+        message: err.response?.data || err.message
       },
       { status: 500 }
     );
