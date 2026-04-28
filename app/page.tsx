@@ -1,154 +1,139 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts";
 
-/* ---------- CONFIG ---------- */
-
-const STATUS_COLORS: Record<string, string> = {
-  Done: "#22c55e",
-  "In Progress": "#facc15",
-  "In Review": "#38bdf8",
-  "To Do": "#ef4444"
-};
-
-/* ---------- COMPONENT ---------- */
+/* ---------------- COMPONENT ---------------- */
 
 export default function ReleaseDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  async function loadDashboard() {
-    const res = await fetch("/api/analyze", { cache: "no-store" });
-    const result = await res.json();
-    setData(result);
-    setLoading(false);
-  }
-
   useEffect(() => {
-    loadDashboard();
+    fetch("/api/analyze", { cache: "no-store" })
+      .then(res => res.json())
+      .then(result => {
+        setData(result);
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
-    return <p style={{ padding: 40 }}>Loading dashboard…</p>;
+    return <p style={{ padding: 40 }}>Loading release readiness…</p>;
   }
 
-  const statusCount = data.jiraIssues.reduce((acc: any, i: any) => {
-    acc[i.status] = (acc[i.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  const chartData = Object.keys(statusCount).map(status => ({
-    name: status,
-    value: statusCount[status]
-  }));
+  const readinessStatus =
+    data.readinessStatus || "AT_RISK";
 
   return (
     <main style={{ padding: 40, fontFamily: "Segoe UI, system-ui" }}>
-      <h1>🚀 Release Readiness Dashboard</h1>
+      {/* ================= HEADER ================= */}
+      <h1>Release Readiness Overview</h1>
+      <p style={{ color: "#555", maxWidth: 800 }}>
+        This dashboard evaluates whether the current release is safe to deploy
+        by comparing <b>planned work</b> from Jira with <b>actual code changes</b>
+        from GitHub.
+      </p>
 
-      <section style={heroStyle}>
-        <h2>{data.readinessScore} / 100</h2>
-        <p>Release readiness derived from Jira & GitHub signals</p>
+      {/* ================= SCORE CARD ================= */}
+      <section style={card}>
+        <h2>
+          Score: {data.readinessScore} / 100 —{" "}
+          {readinessStatus === "READY"
+            ? "✅ READY"
+            : readinessStatus === "AT_RISK"
+            ? "⚠ AT RISK"
+            : "🚨 NOT READY"}
+        </h2>
+
+        <p style={{ color: "#555" }}>
+          The readiness score summarizes delivery completion, code validation,
+          and release risk signals.
+        </p>
       </section>
 
-      <section style={kpiGrid}>
-        <Kpi title="Total Work Items" value={data.jiraIssues.length} />
-        <Kpi
-          title="Completed"
-          value={data.jiraIssues.filter((i: any) => i.status === "Done").length}
-        />
-        <Kpi
-          title="Open Risk Items"
-          value={data.jiraIssues.filter((i: any) => i.status !== "Done").length}
-        />
-        <Kpi title="Commits in Scope" value={data.commits.length} />
+      {/* ================= WHY THIS SCORE ================= */}
+      <section style={card}>
+        <h3>Why is this the Readiness Score?</h3>
+        <ul>
+          <li>
+            {data.metrics?.jira?.openIssues > 0
+              ? `${data.metrics.jira.openIssues} planned work items are still open`
+              : "All planned Jira work items are completed ✅"}
+          </li>
+          <li>
+            {data.metrics?.jira?.blockerIssues > 0
+              ? "Blocker tickets are present 🚨"
+              : "No blocker Jira tickets detected ✅"}
+          </li>
+          <li>
+            {data.metrics?.github?.totalCommits > 0
+              ? "Code changes were detected in GitHub ✅"
+              : "No code changes detected 🚨"}
+          </li>
+        </ul>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 30 }}>
-        <div style={card}>
-          <h3>Jira Status Distribution</h3>
-          <div style={{ height: 280 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={chartData} dataKey="value" nameKey="name" label>
-                  {chartData.map((e, i) => (
-                    <Cell key={i} fill={STATUS_COLORS[e.name]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* ================= SCORE BREAKDOWN ================= */}
+      <section style={card}>
+        <h3>How the Readiness Score Was Calculated</h3>
 
-        <div style={card}>
-          <h3>Release Risk Summary</h3>
-          <ul>
-            <li>🚨 To Do: {statusCount["To Do"] || 0}</li>
-            <li>⚠ In Progress: {statusCount["In Progress"] || 0}</li>
-            <li>🔍 In Review: {statusCount["In Review"] || 0}</li>
-            <li>✅ Done: {statusCount["Done"] || 0}</li>
-          </ul>
-        </div>
+        <table width="100%" cellPadding={8}>
+          <tbody>
+            <tr>
+              <td>Jira Completion Contribution</td>
+              <td align="right">
+                {Math.round(
+                  (data.metrics?.jira?.completionRatio || 0) * 60
+                )}{" "}
+                / 60
+              </td>
+            </tr>
+            <tr>
+              <td>GitHub Activity Validation</td>
+              <td align="right">
+                {data.metrics?.github?.totalCommits > 0 ? "20 / 20" : "0 / 20"}
+              </td>
+            </tr>
+            <tr>
+              <td>Open Work Risk Penalty</td>
+              <td align="right">
+                −
+                {Math.min(
+                  (data.metrics?.jira?.openIssues || 0) * 5,
+                  20
+                )}{" "}
+                / 20
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <b>Final Readiness Score</b>
+              </td>
+              <td align="right">
+                <b>{data.readinessScore} / 100</b>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
-      <section style={{ ...card, marginTop: 40 }}>
-        <h3>Action Items Before Release</h3>
-        {data.jiraIssues
-          .filter((i: any) => i.status !== "Done")
-          .map((i: any) => (
-            <p key={i.key}>
-              🔴 {i.key} – {i.summary} ({i.status})
-            </p>
-          ))}
-      </section>
-    </main>
-  );
-}
+      {/* ================= RELEASE GATES ================= */}
+      <section style={card}>
+        <h3>Release Gates Status</h3>
 
-/* ---------- UI HELPERS ---------- */
+        <h4>Mandatory Gates (must pass)</h4>
+        <ul>
+          {data.failedGates && data.failedGates.length > 0 ? (
+            data.failedGates.map((g: string, i: number) => (
+              <li key={i}>🚨 {g}</li>
+            ))
+          ) : (
+            <>
+              <li>✅ No blocker Jira tickets</li>
+              <li>✅ Code changes present</li>
+            </>
+          )}
+        </ul>
 
-function Kpi({ title, value }: any) {
-  return (
-    <div style={kpiCard}>
-      <p style={{ color: "#666" }}>{title}</p>
-      <h2>{value}</h2>
-    </div>
-  );
-}
-
-const heroStyle = {
-  background: "#f8fafc",
-  padding: 30,
-  borderRadius: 14,
-  marginBottom: 30
-};
-
-const kpiGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gap: 20,
-  marginBottom: 40
-};
-
-const kpiCard = {
-  background: "#ffffff",
-  padding: 20,
-  borderRadius: 14,
-  boxShadow: "0 8px 20px rgba(0,0,0,0.08)"
-};
-
-const card = {
-  background: "#ffffff",
-  padding: 25,
-  borderRadius: 14,
-  boxShadow: "0 8px 20px rgba(0,0,0,0.08)"
-};
-``
+        <h4>Advisory Risk Signals</h4>
+        <ul>
