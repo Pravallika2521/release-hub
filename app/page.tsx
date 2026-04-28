@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-/* ---------------- COMPONENT ---------------- */
-
 export default function ReleaseDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -21,16 +19,16 @@ export default function ReleaseDashboard() {
     return <p style={{ padding: 40 }}>Loading release readiness…</p>;
   }
 
-  const readinessStatus =
-    data.readinessStatus || "AT_RISK";
+  // ✅ FIXED: assign readinessStatus correctly
+  const readinessStatus = data.readinessStatus || "AT_RISK";
 
   return (
     <main style={{ padding: 40, fontFamily: "Segoe UI, system-ui" }}>
       {/* ================= HEADER ================= */}
       <h1>Release Readiness Overview</h1>
       <p style={{ color: "#555", maxWidth: 800 }}>
-        This dashboard evaluates whether the current release is safe to deploy
-        by comparing <b>planned work</b> from Jira with <b>actual code changes</b>
+        This dashboard evaluates whether the current release is safe to deploy by
+        comparing <b>planned work</b> from Jira with <b>actual code changes</b>{" "}
         from GitHub.
       </p>
 
@@ -91,7 +89,9 @@ export default function ReleaseDashboard() {
             <tr>
               <td>GitHub Activity Validation</td>
               <td align="right">
-                {data.metrics?.github?.totalCommits > 0 ? "20 / 20" : "0 / 20"}
+                {data.metrics?.github?.totalCommits > 0
+                  ? "20 / 20"
+                  : "0 / 20"}
               </td>
             </tr>
             <tr>
@@ -137,3 +137,34 @@ export default function ReleaseDashboard() {
 
         <h4>Advisory Risk Signals</h4>
         <ul>
+          {data.advisoryRisks && data.advisoryRisks.length > 0 ? (
+            data.advisoryRisks.map((r: string, i: number) => (
+              <li key={i}>⚠ {r}</li>
+            ))
+          ) : (
+            <li>No advisory risks detected</li>
+          )}
+        </ul>
+      </section>
+
+      {/* ================= CHANGE SUMMARY ================= */}
+      <section style={card}>
+        <h3>What Changed Since Last Update</h3>
+        <p style={{ color: "#555" }}>
+          This section highlights progress or new risks compared to the previous
+          analysis run.
+        </p>
+      </section>
+    </main>
+  );
+}
+
+/* ---------------- STYLES ---------------- */
+
+const card = {
+  background: "#ffffff",
+  padding: 25,
+  borderRadius: 12,
+  marginTop: 25,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.08)"
+};
