@@ -1,52 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
 
-/* ---------------- TYPES ---------------- */
+/* ---------- CONFIG ---------- */
 
-type JiraIssue = {
-  key: string;
-  summary: string;
-  status: string;
-  assignee?: string;
+const STATUS_COLORS: Record<string, string> = {
+  Done: "#22c55e",
+  "In Progress": "#facc15",
+  "In Review": "#38bdf8",
+  "To Do": "#ef4444"
 };
 
-/* ---------------- COMPONENT ---------------- */
+/* ---------- COMPONENT ---------- */
 
 export default function ReleaseDashboard() {
-  const [view, setView] = useState<"dashboard" | "issues">("dashboard");
-  const [summary, setSummary] = useState<any>(null);
-  const [issues, setIssues] = useState<JiraIssue[]>([]);
-  const [selectedIssue, setSelectedIssue] = useState<any>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  /* -------- FETCH RELEASE SUMMARY -------- */
-
   async function loadDashboard() {
-    setLoading(true);
     const res = await fetch("/api/analyze", { cache: "no-store" });
-    const data = await res.json();
-    setSummary(data);
+    const result = await res.json();
+    setData(result);
     setLoading(false);
-  }
-
-  /* -------- FETCH ALL ISSUES -------- */
-
-  async function openIssuesView() {
-    const res = await fetch("/api/jira/issues", { cache: "no-store" });
-    const data = await res.json();
-    setIssues(data);
-    setView("issues");
-  }
-
-  /* -------- FETCH SINGLE ISSUE -------- */
-
-  async function openIssue(key: string) {
-    const res = await fetch(`/api/jira/issue/${key}`, {
-      cache: "no-store"
-    });
-    const data = await res.json();
-    setSelectedIssue(data);
   }
 
   useEffect(() => {
@@ -57,151 +39,116 @@ export default function ReleaseDashboard() {
     return <p style={{ padding: 40 }}>Loading dashboard…</p>;
   }
 
-  /* ---------------- DASHBOARD VIEW ---------------- */
+  const statusCount = data.jiraIssues.reduce((acc: any, i: any) => {
+    acc[i.status] = (acc[i.status] || 0) + 1;
+    return acc;
+  }, {});
 
-  if (view === "dashboard") {
-    return (
-      <main style={{ padding: 40 }}>
-        <h1>🚀 Release Dashboard</h1>
+  const chartData = Object.keys(statusCount).map(status => ({
+    name: status,
+    value: statusCount[status]
+  }));
 
-        <div style={{ marginBottom: 30 }}>
-          <h2>{summary.readinessScore} / 100</h2>
-          <p>Release readiness score</p>
+  return (
+    <main style={{ padding: 40, fontFamily: "Segoe UI, system-ui" }}>
+      <h1>🚀 Release Readiness Dashboard</h1>
+
+      <section style={heroStyle}>
+        <h2>{data.readinessScore} / 100</h2>
+        <p>Release readiness derived from Jira & GitHub signals</p>
+      </section>
+
+      <section style={kpiGrid}>
+        <Kpi title="Total Work Items" value={data.jiraIssues.length} />
+        <Kpi
+          title="Completed"
+          value={data.jiraIssues.filter((i: any) => i.status === "Done").length}
+        />
+        <Kpi
+          title="Open Risk Items"
+          value={data.jiraIssues.filter((i: any) => i.status !== "Done").length}
+        />
+        <Kpi title="Commits in Scope" value={data.commits.length} />
+      </section>
+
+      <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 30 }}>
+        <div style={card}>
+          <h3>Jira Status Distribution</h3>
+          <div style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" label>
+                  {chartData.map((e, i) => (
+                    <Cell key={i} fill={STATUS_COLORS[e.name]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div style={grid}>
-          <Card
-            title="Total Work Items"
-            value={summary.jiraIssues.length}
-            onClick={openIssuesView}
-          />
-          <Card
-            title="Completed"
-            value={summary.jiraIssues.filter((i: any) => i.status === "Done").length}
-          />
-          <Card
-            title="Open Risk Items"
-            value={summary.jiraIssues.filter((i: any) => i.status !== "Done").length}
-          />
-          <Card title="Commits" value={summary.commits.length} />
+        <div style={card}>
+          <h3>Release Risk Summary</h3>
+          <ul>
+            <li>🚨 To Do: {statusCount["To Do"] || 0}</li>
+            <li>⚠ In Progress: {statusCount["In Progress"] || 0}</li>
+            <li>🔍 In Review: {statusCount["In Review"] || 0}</li>
+            <li>✅ Done: {statusCount["Done"] || 0}</li>
+          </ul>
         </div>
+      </section>
 
-        <h3 style={{ marginTop: 40 }}>Action Items</h3>
-        {summary.jiraIssues
+      <section style={{ ...card, marginTop: 40 }}>
+        <h3>Action Items Before Release</h3>
+        {data.jiraIssues
           .filter((i: any) => i.status !== "Done")
           .map((i: any) => (
             <p key={i.key}>
               🔴 {i.key} – {i.summary} ({i.status})
             </p>
           ))}
-      </main>
-    );
-  }
-
-  /* ---------------- ISSUES VIEW ---------------- */
-
-  return (
-    <main style={{ padding: 40 }}>
-      <button onClick={() => setView("dashboard")}>← Back to Dashboard</button>
-
-      <h2 style={{ marginTop: 20 }}>📋 Work Items</h2>
-
-      <table width="100%" cellPadding={10}>
-        <thead>
-          <tr>
-            <th align="left">Key</th>
-            <th align="left">Summary</th>
-            <th align="left">Status</th>
-            <th align="left">Assignee</th>
-          </tr>
-        </thead>
-        <tbody>
-          {issues.map(issue => (
-            <tr
-              key={issue.key}
-              style={{ cursor: "pointer" }}
-              onClick={() => openIssue(issue.key)}
-            >
-              <td>{issue.key}</td>
-              <td>{issue.summary}</td>
-              <td>{issue.status}</td>
-              <td>{issue.assignee || "Unassigned"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* ---------------- ISSUE DETAILS ---------------- */}
-
-      {selectedIssue && (
-        <div style={detailsBox}>
-          <h3>{selectedIssue.key}</h3>
-          <p><b>Status:</b> {selectedIssue.status}</p>
-          <p><b>Summary:</b> {selectedIssue.summary}</p>
-          <p><b>Assignee:</b> {selectedIssue.assignee || "Unassigned"}</p>
-
-          <h4>Subtasks</h4>
-          {selectedIssue.subtasks.length === 0 ? (
-            <p>No subtasks</p>
-          ) : (
-            <ul>
-              {selectedIssue.subtasks.map((s: any) => (
-                <li key={s.key}>
-                  {s.key} – {s.fields.summary}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h4>Attachments</h4>
-          {selectedIssue.attachments.length === 0 ? (
-            <p>No attachments</p>
-          ) : (
-            <ul>
-              {selectedIssue.attachments.map((a: any) => (
-                <li key={a.id}>
-                  <a href={a.content} target="_blank">
-                    {a.filename}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      </section>
     </main>
   );
 }
 
-/* ---------------- UI HELPERS ---------------- */
+/* ---------- UI HELPERS ---------- */
 
-function Card({ title, value, onClick }: any) {
+function Kpi({ title, value }: any) {
   return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: 20,
-        background: "#fff",
-        borderRadius: 12,
-        boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-        cursor: onClick ? "pointer" : "default"
-      }}
-    >
-      <p>{title}</p>
+    <div style={kpiCard}>
+      <p style={{ color: "#666" }}>{title}</p>
       <h2>{value}</h2>
     </div>
   );
 }
 
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
-  gap: 20
+const heroStyle = {
+  background: "#f8fafc",
+  padding: 30,
+  borderRadius: 14,
+  marginBottom: 30
 };
 
-const detailsBox = {
-  marginTop: 30,
-  padding: 20,
-  background: "#f9fafb",
-  borderRadius: 10
+const kpiGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: 20,
+  marginBottom: 40
 };
+
+const kpiCard = {
+  background: "#ffffff",
+  padding: 20,
+  borderRadius: 14,
+  boxShadow: "0 8px 20px rgba(0,0,0,0.08)"
+};
+
+const card = {
+  background: "#ffffff",
+  padding: 25,
+  borderRadius: 14,
+  boxShadow: "0 8px 20px rgba(0,0,0,0.08)"
+};
+``
