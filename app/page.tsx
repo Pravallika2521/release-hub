@@ -4,162 +4,91 @@ import { useEffect, useState } from "react";
 
 export default function ReleaseDashboard() {
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/analyze", { cache: "no-store" })
       .then(res => res.json())
-      .then(result => {
-        setData(result);
-        setLoading(false);
-      });
+      .then(setData);
   }, []);
 
-  if (loading) {
-    return <p style={{ padding: 40 }}>Loading release readiness…</p>;
+  if (!data) {
+    return <p style={{ padding: 40 }}>Loading release data…</p>;
   }
 
-  // ✅ FIXED: assign readinessStatus correctly
-  const readinessStatus = data.readinessStatus || "AT_RISK";
+  const { jiraMetrics, githubMetrics, readiness } = data;
 
   return (
     <main style={{ padding: 40, fontFamily: "Segoe UI, system-ui" }}>
-      {/* ================= HEADER ================= */}
-      <h1>Release Readiness Overview</h1>
-      <p style={{ color: "#555", maxWidth: 800 }}>
-        This dashboard evaluates whether the current release is safe to deploy by
-        comparing <b>planned work</b> from Jira with <b>actual code changes</b>{" "}
-        from GitHub.
-      </p>
+      {/* ================= RELEASE FACTS ================= */}
+      <h1>Release Readiness Dashboard</h1>
 
-      {/* ================= SCORE CARD ================= */}
       <section style={card}>
-        <h2>
-          Score: {data.readinessScore} / 100 —{" "}
-          {readinessStatus === "READY"
-            ? "✅ READY"
-            : readinessStatus === "AT_RISK"
-            ? "⚠ AT RISK"
-            : "🚨 NOT READY"}
-        </h2>
-
-        <p style={{ color: "#555" }}>
-          The readiness score summarizes delivery completion, code validation,
-          and release risk signals.
-        </p>
+        <h2>Release Facts</h2>
+        <ul>
+          <li>Total Tickets: {jiraMetrics.totalTickets}</li>
+          <li>Completed: {jiraMetrics.doneTickets}</li>
+          <li>Open: {jiraMetrics.openTickets}</li>
+          <li>Blocked: {jiraMetrics.blockedTickets}</li>
+          <li>Completion: {jiraMetrics.completionPercent}%</li>
+          <li>GitHub Commits: {githubMetrics.commitCount}</li>
+        </ul>
       </section>
 
-      {/* ================= WHY THIS SCORE ================= */}
+      {/* ================= RELEASE DECISION ================= */}
       <section style={card}>
-        <h3>Why is this the Readiness Score?</h3>
+        <h2>
+          Release Decision: {readiness.status}
+        </h2>
+        <p>
+          Readiness Score: <b>{readiness.score} / 100</b>
+        </p>
         <ul>
-          <li>
-            {data.metrics?.jira?.openIssues > 0
-              ? `${data.metrics.jira.openIssues} planned work items are still open`
-              : "All planned Jira work items are completed ✅"}
-          </li>
-          <li>
-            {data.metrics?.jira?.blockerIssues > 0
-              ? "Blocker tickets are present 🚨"
-              : "No blocker Jira tickets detected ✅"}
-          </li>
-          <li>
-            {data.metrics?.github?.totalCommits > 0
-              ? "Code changes were detected in GitHub ✅"
-              : "No code changes detected 🚨"}
-          </li>
+          {readiness.reasons.map((r: string, i: number) => (
+            <li key={i}>• {r}</li>
+          ))}
         </ul>
       </section>
 
       {/* ================= SCORE BREAKDOWN ================= */}
       <section style={card}>
-        <h3>How the Readiness Score Was Calculated</h3>
-
-        <table width="100%" cellPadding={8}>
+        <h2>Score Breakdown</h2>
+        <table width="100%" cellPadding={6}>
           <tbody>
             <tr>
-              <td>Jira Completion Contribution</td>
+              <td>Jira Completion</td>
               <td align="right">
                 {Math.round(
-                  (data.metrics?.jira?.completionRatio || 0) * 60
+                  (jiraMetrics.doneTickets /
+                    Math.max(jiraMetrics.totalTickets, 1)) *
+                    60
                 )}{" "}
                 / 60
               </td>
             </tr>
             <tr>
-              <td>GitHub Activity Validation</td>
-              <td align="right">
-                {data.metrics?.github?.totalCommits > 0
-                  ? "20 / 20"
-                  : "0 / 20"}
-              </td>
+              <td>GitHub Validation</td>
+              <td align="right">20 / 20</td>
             </tr>
             <tr>
-              <td>Open Work Risk Penalty</td>
+              <td>Open Work Penalty</td>
               <td align="right">
-                −
-                {Math.min(
-                  (data.metrics?.jira?.openIssues || 0) * 5,
-                  20
-                )}{" "}
-                / 20
+                −{Math.min(jiraMetrics.openTickets * 5, 20)} / 20
               </td>
             </tr>
             <tr>
               <td>
-                <b>Final Readiness Score</b>
+                <b>Final Score</b>
               </td>
               <td align="right">
-                <b>{data.readinessScore} / 100</b>
+                <b>{readiness.score} / 100</b>
               </td>
             </tr>
           </tbody>
         </table>
       </section>
-
-      {/* ================= RELEASE GATES ================= */}
-      <section style={card}>
-        <h3>Release Gates Status</h3>
-
-        <h4>Mandatory Gates (must pass)</h4>
-        <ul>
-          {data.failedGates && data.failedGates.length > 0 ? (
-            data.failedGates.map((g: string, i: number) => (
-              <li key={i}>🚨 {g}</li>
-            ))
-          ) : (
-            <>
-              <li>✅ No blocker Jira tickets</li>
-              <li>✅ Code changes present</li>
-            </>
-          )}
-        </ul>
-
-        <h4>Advisory Risk Signals</h4>
-        <ul>
-          {data.advisoryRisks && data.advisoryRisks.length > 0 ? (
-            data.advisoryRisks.map((r: string, i: number) => (
-              <li key={i}>⚠ {r}</li>
-            ))
-          ) : (
-            <li>No advisory risks detected</li>
-          )}
-        </ul>
-      </section>
-
-      {/* ================= CHANGE SUMMARY ================= */}
-      <section style={card}>
-        <h3>What Changed Since Last Update</h3>
-        <p style={{ color: "#555" }}>
-          This section highlights progress or new risks compared to the previous
-          analysis run.
-        </p>
-      </section>
     </main>
   );
 }
-
-/* ---------------- STYLES ---------------- */
 
 const card = {
   background: "#ffffff",
@@ -168,3 +97,4 @@ const card = {
   marginTop: 25,
   boxShadow: "0 6px 16px rgba(0,0,0,0.08)"
 };
+``
