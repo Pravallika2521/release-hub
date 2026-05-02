@@ -11,107 +11,86 @@ export async function GET() {
 
   /* ---------------- JIRA METRICS ---------------- */
 
-  const totalIssues = jiraIssues.length;
-  const doneIssues = jiraIssues.filter(
+  const totalTickets = jiraIssues.length;
+
+  const doneTickets = jiraIssues.filter(
     (i: any) => i.status === "Done"
   ).length;
 
-  const openIssues = totalIssues - doneIssues;
-
-  // Treat "Blocked" as hard blockers if present
-  const blockerIssues = jiraIssues.filter(
+  const blockedTickets = jiraIssues.filter(
     (i: any) =>
       i.status === "Blocked" ||
       i.status === "Blocker"
   ).length;
 
-  const completionRatio =
-    totalIssues === 0 ? 0 : doneIssues / totalIssues;
+  const openTickets = totalTickets - doneTickets;
+
+  const completionPercent =
+    totalTickets === 0
+      ? 0
+      : Math.round((doneTickets / totalTickets) * 100);
 
   /* ---------------- GITHUB METRICS ---------------- */
 
-  const totalCommits = commits.length;
+  const commitCount = commits.length;
 
   /* ---------------- READINESS GATES ---------------- */
 
-  let readinessScore = 0;
-  const failedGates: string[] = [];
-  const advisoryRisks: string[] = [];
-
-  /* ✅ Mandatory Gate 1: No blocker tickets */
-  if (blockerIssues > 0) {
-    failedGates.push(
-      `${blockerIssues} blocker Jira ticket(s) open`
-    );
-  }
-
-  /* ✅ Mandatory Gate 2: Code activity exists */
-  if (totalCommits === 0) {
-    failedGates.push(
-      "No GitHub commits found for this release"
-    );
-  }
-
-  /* ---------------- SCORING (only if mandatory gates pass) ---------------- */
-
-  if (failedGates.length === 0) {
-    // Jira completion contributes up to 60 points
-    readinessScore += Math.round(completionRatio * 60);
-
-    // Code activity sanity (up to 20 points)
-    if (totalCommits >= doneIssues) {
-      readinessScore += 20;
-    } else {
-      advisoryRisks.push(
-        "Code changes may not fully reflect Jira completion"
-      );
-      readinessScore += 10;
-    }
-
-    // Penalize for open issues (up to -20)
-    readinessScore -= Math.min(openIssues * 5, 20);
-  }
-
-  /* ---------------- FINAL CLASSIFICATION ---------------- */
-
   let readinessStatus: "READY" | "AT_RISK" | "NOT_READY";
+  let reasons: string[] = [];
 
-  if (failedGates.length > 0) {
+  if (blockedTickets > 0) {
     readinessStatus = "NOT_READY";
-    readinessScore = Math.min(readinessScore, 30);
-  } else if (readinessScore >= 70) {
-    readinessStatus = "READY";
+    reasons.push(`${blockedTickets} blocker ticket(s) open`);
+  } else if (commitCount === 0) {
+    readinessStatus = "NOT_READY";
+    reasons.push("No GitHub commits found");
   } else {
     readinessStatus = "AT_RISK";
+  }
+
+  /* ---------------- SCORE CALCULATION ---------------- */
+
+  let jiraScore = Math.round((doneTickets / Math.max(totalTickets, 1)) * 60);
+  let githubScore = commitCount > 0 ? 20 : 0;
+  let openPenalty = Math.min(openTickets * 5, 20);
+
+  let readinessScore = jiraScore + githubScore - openPenalty;
+
+  if (blockedTickets > 0) {
+    readinessScore = Math.min(readinessScore, 30);
+  }
+
+  if (readinessScore >= 70 && blockedTickets === 0) {
+    readinessStatus = "READY";
+  }
+
+  if (reasons.length === 0) {
+    if (openTickets > 0) {
+      reasons.push(`${openTickets} tickets still open`);
+    }
+    reasons.push("Code changes validated via GitHub");
   }
 
   /* ---------------- RESPONSE ---------------- */
 
   return new Response(
     JSON.stringify({
-      readinessScore,
-      readinessStatus,
-
-      metrics: {
-        jira: {
-          totalIssues,
-          doneIssues,
-          openIssues,
-          blockerIssues,
-          completionRatio: Number(
-            (completionRatio * 100).toFixed(1)
-          )
-        },
-        github: {
-          totalCommits
-        }
+      jiraMetrics: {
+        totalTickets,
+        doneTickets,
+        openTickets,
+        blockedTickets,
+        completionPercent
       },
-
-      failedGates,
-      advisoryRisks,
-
-      jiraIssues,
-      commits
+      githubMetrics: {
+        commitCount
+      },
+      readiness: {
+        score: readinessScore,
+        status: readinessStatus,
+        reasons
+      }
     }),
     {
       headers: {
@@ -121,3 +100,4 @@ export async function GET() {
     }
   );
 }
+``
