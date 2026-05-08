@@ -4,63 +4,97 @@ import { useEffect, useState } from "react";
 
 export default function ReleaseDashboard() {
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/analyze", { cache: "no-store" })
       .then(res => res.json())
-      .then(result => {
-        setData(result);
-        setLoading(false);
-      });
+      .then(result => setData(result));
   }, []);
 
-  if (loading) {
-    return <p style={{ padding: 40 }}>Loading release readiness dashboard…</p>;
+  if (!data) {
+    return <p style={{ padding: 40 }}>Loading release data…</p>;
   }
 
-  const { jiraMetrics, githubMetrics, readiness, source } = data;
+  const { jiraMetrics, githubMetrics, readiness } = data;
 
   return (
     <main style={{ padding: 40, fontFamily: "Segoe UI, system-ui" }}>
-      {/* ================= HEADER ================= */}
       <h1>Release Readiness Dashboard</h1>
-      <p style={{ color: "#555", maxWidth: 800 }}>
-        This dashboard evaluates release readiness by comparing
-        <b> planned work from Jira</b> with
-        <b> actual delivery from GitHub</b>.
-      </p>
 
-      <p style={{ fontSize: 12, color: "#888" }}>
-        Data source: {source || "node-backend"}
-      </p>
-
-      {/* ================= RELEASE FACTS ================= */}
+      {/* ===== Release Facts ===== */}
       <section style={card}>
         <h2>Release Facts</h2>
         <ul>
-          <li><b>Total Tickets:</b> {jiraMetrics.totalTickets}</li>
-          <li><b>Completed:</b> {jiraMetrics.doneTickets}</li>
-          <li><b>Open:</b> {jiraMetrics.openTickets}</li>
-          <li><b>Blocked:</b> {jiraMetrics.blockedTickets}</li>
-          <li><b>Completion:</b> {jiraMetrics.completionPercent}%</li>
-          <li><b>GitHub Commits:</b> {githubMetrics.commitCount}</li>
+          <li>Total Tickets: {jiraMetrics.totalTickets}</li>
+          <li>Completed: {jiraMetrics.doneTickets}</li>
+          <li>Open: {jiraMetrics.openTickets}</li>
+          <li>Blocked: {jiraMetrics.blockedTickets}</li>
+          <li>Completion: {jiraMetrics.completionPercent}%</li>
+          <li>GitHub Commits: {githubMetrics.commitCount}</li>
         </ul>
       </section>
 
-      {/* ================= RELEASE DECISION ================= */}
+      {/* ===== Release Decision ===== */}
       <section style={card}>
         <h2>Release Decision</h2>
-        <p style={{ fontSize: 20 }}>
-          <b>Status:</b>{" "}
-          {readiness.status === "READY"
-            ? "✅ READY"
-            : readiness.status === "AT_RISK"
-            ? "⚠ AT RISK"
-            : "🚨 NOT READY"}
-        </p>
-
         <p>
-          <b>Readiness Score:</b> {readiness.score} / 100
+          <strong>Status:</strong> {readiness.status}
         </p>
+        <p>
+          <strong>Score:</strong> {readiness.score} / 100
+        </p>
+        <ul>
+          {readiness.reasons.map((r: string, i: number) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      </section>
 
+      {/* ===== Score Breakdown ===== */}
+      <section style={card}>
+        <h2>Score Breakdown</h2>
+        <table width="100%" cellPadding={6}>
+          <tbody>
+            <tr>
+              <td>Jira Completion</td>
+              <td align="right">
+                {Math.round(
+                  (jiraMetrics.doneTickets /
+                    Math.max(jiraMetrics.totalTickets, 1)) *
+                    60
+                )}{" "}
+                / 60
+              </td>
+            </tr>
+            <tr>
+              <td>GitHub Validation</td>
+              <td align="right">20 / 20</td>
+            </tr>
+            <tr>
+              <td>Open Work Penalty</td>
+              <td align="right">
+                −{Math.min(jiraMetrics.openTickets * 5, 20)} / 20
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Final Score</strong>
+              </td>
+              <td align="right">
+                <strong>{readiness.score} / 100</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  );
+}
+
+const card = {
+  background: "#ffffff",
+  padding: 20,
+  borderRadius: 10,
+  marginTop: 20,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+};
