@@ -1,27 +1,31 @@
 import axios from "axios";
 
 export async function getJiraIssues() {
+  // ✅ HARD PROOF that function is executed
+  console.error("🔥 getJiraIssues() CALLED");
+
   const issues: any[] = [];
   let startAt = 0;
   const maxResults = 50;
 
+  const baseUrl = process.env.JIRA_BASE_URL!;
+  const email = process.env.JIRA_EMAIL!;
+  const token = process.env.JIRA_API_TOKEN!;
+  const projectKey = process.env.JIRA_PROJECT_KEY!;
+
   while (true) {
     const response = await axios.get(
-      `${process.env.JIRA_BASE_URL}/rest/api/3/search/jql`,
+      `${baseUrl}/rest/api/3/search`, // ✅ CORRECT ENDPOINT
       {
-        headers: {
-          Accept: "application/json",
-          "Cache-Control": "no-cache"
-        },
         auth: {
-          username: process.env.JIRA_EMAIL!,
-          password: process.env.JIRA_API_TOKEN!
+          username: email,
+          password: token
+        },
+        headers: {
+          Accept: "application/json"
         },
         params: {
-          jql: `
-            project = ${process.env.JIRA_PROJECT_KEY}
-            ORDER BY created DESC
-          `,
+          jql: `project = ${projectKey} ORDER BY created DESC`,
           fields: "summary,status,created,updated",
           startAt,
           maxResults
@@ -29,7 +33,7 @@ export async function getJiraIssues() {
       }
     );
 
-    const batch = response.data.issues || [];
+    const batch = response.data.issues ?? [];
     issues.push(...batch);
 
     if (batch.length < maxResults) break;
@@ -44,3 +48,4 @@ export async function getJiraIssues() {
     updated: issue.fields.updated
   }));
 }
+``
