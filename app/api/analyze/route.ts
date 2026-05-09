@@ -27,10 +27,13 @@ export async function GET() {
   const commits = await getGitHubCommits();
 
   const totalTickets = jiraIssues.length;
-  const doneTickets = jiraIssues.filter((i: any) => i.status === "Done").length;
-  const blockedTickets = jiraIssues.filter(
-    (i: any) => i.status === "Blocked"
-  ).length;
+  const DONE_STATUSES = ["Done", "Closed", "Resolved"];
+const doneTickets = jiraIssues.filter(
+  (i: any) => DONE_STATUSES.includes(i.status)
+).length;
+const blockedTickets = jiraIssues.filter(
+  (i: any) => i.status.toLowerCase().includes("block")
+).length;
   const openTickets = totalTickets - doneTickets;
 
   const completionPercent =
